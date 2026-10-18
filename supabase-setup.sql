@@ -226,3 +226,78 @@ drop trigger if exists shoeapp_booking_slot_guard on public.shoeapp;
 create trigger shoeapp_booking_slot_guard
   before insert or update of payload on public.shoeapp
   for each row execute function public.enforce_shoeapp_booking_slot();
+-- Repair general-member availability lookup and preserve database-side duplicate protection.
+-- Brand members see occupied times only. Reservation details remain protected by RLS.
+create or replace function public.shoeapp_reserved_slots(p_slot_date date)
+returns table(slot_time text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select distinct b.value->>'time' as slot_time
+  from public.shoeapp s
+  cross join lateral jsonb_array_elements(coalesce(s.payload->'books', '[]'::jsonb)) as b(value)
+  where s.brand is not null
+    and (b.value->>'completed') is distinct from 'true'
+    and b.value->>'date' = p_slot_date::text
+    and nullif(b.value->>'time', '') is not null;
+$$;
+revoke all on function public.shoeapp_reserved_slots(date) from public, anon;
+grant execute on function public.shoeapp_reserved_slots(date) to authenticated;
+
+create or replace function public.enforce_shoeapp_booking_slot()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if jsonb_typeof(coalesce(new.payload->'books', '[]'::jsonb)) <> 'array' then
+    return new;
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('shoeapp_booking_slots', 0));
+
+  if exists (
+    select 1
+    from jsonb_array_elements(coalesce(new.payload->'books', '[]'::jsonb)) with ordinality as a(value, position)
+    join jsonb_array_elements(coalesce(new.payload->'books', '[]'::jsonb)) with ordinality as b(value, position)
+      on a.value->>'date' = b.value->>'date'
+     and a.value->>'time' = b.value->>'time'
+     and a.position < b.position
+    where (a.value->>'completed') is distinct from 'true'
+      and (b.value->>'completed') is distinct from 'true'
+      and nullif(a.value->>'date', '') is not null
+      and nullif(a.value->>'time', '') is not null
+  ) then
+    raise exception '이미 예약된 날짜와 시간입니다.'
+      using errcode = '23505', constraint = 'shoeapp_booking_slot_unique';
+  end if;
+
+  if exists (
+    select 1
+    from public.shoeapp other
+    cross join lateral jsonb_array_elements(coalesce(other.payload->'books', '[]'::jsonb)) as existing(value)
+    join lateral jsonb_array_elements(coalesce(new.payload->'books', '[]'::jsonb)) as candidate(value)
+      on candidate.value->>'date' = existing.value->>'date'
+     and candidate.value->>'time' = existing.value->>'time'
+    where other.brand is not null
+      and other.brand is distinct from new.brand
+      and (existing.value->>'completed') is distinct from 'true'
+      and (candidate.value->>'completed') is distinct from 'true'
+      and nullif(candidate.value->>'date', '') is not null
+      and nullif(candidate.value->>'time', '') is not null
+  ) then
+    raise exception '이미 다른 브랜드가 예약한 날짜와 시간입니다.'
+      using errcode = '23505', constraint = 'shoeapp_booking_slot_unique';
+  end if;
+
+  return new;
+end;
+$$;
+drop trigger if exists shoeapp_booking_slot_guard on public.shoeapp;
+create trigger shoeapp_booking_slot_guard
+  before insert or update of payload on public.shoeapp
+  for each row execute function public.enforce_shoeapp_booking_slot();
+
+notify pgrst, 'reload schema';
