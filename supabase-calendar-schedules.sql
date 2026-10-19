@@ -33,6 +33,7 @@ begin
     select 1 from jsonb_array_elements(coalesce(new.payload->'books','[]'::jsonb)) with ordinality a(value,pos)
     join jsonb_array_elements(coalesce(new.payload->'books','[]'::jsonb)) with ordinality b(value,pos)
       on a.value->>'date'=b.value->>'date' and a.value->>'time'=b.value->>'time' and a.pos<b.pos
+      and a.value->>'groupId' is distinct from b.value->>'groupId'
     where (a.value->>'completed') is distinct from 'true' and (b.value->>'completed') is distinct from 'true'
       and nullif(a.value->>'date','') is not null and nullif(a.value->>'time','') is not null
   ) then raise exception '이미 예약된 날짜와 시간입니다.' using errcode='23505', constraint='shoeapp_booking_slot_unique'; end if;
