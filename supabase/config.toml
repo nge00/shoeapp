@@ -1,0 +1,4 @@
+[functions.shoeapp-admin]
+# This endpoint authenticates its own password-only login and opaque sessions.
+# It never trusts a browser-supplied role or exposes a service key.
+verify_jwt = false
