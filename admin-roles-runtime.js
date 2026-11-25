@@ -120,7 +120,10 @@ const baseRenderAuth=renderAuth;
 renderAuth=function(mode='signup'){
   const brandAdmin=mode==='brand-admin';baseRenderAuth(brandAdmin?'admin':mode);
   const box=document.querySelector('.auth-box');if(!box)return;
-  const tabs=box.querySelector('.auth-tabs'),button=document.createElement('button');button.type='button';button.className='auth-tab'+(brandAdmin?' active':'');button.textContent='브랜드관리자 로그인';button.onclick=()=>renderAuth('brand-admin');tabs.appendChild(button);
+  const tabs=box.querySelector('.auth-tabs');
+  if(brandAdmin)tabs.querySelectorAll('.auth-tab.active').forEach(tab=>tab.classList.remove('active'));
+  const button=document.createElement('button');button.type='button';button.className='auth-tab'+(brandAdmin?' active':'');button.textContent='브랜드관리자 로그인';button.onclick=()=>renderAuth('brand-admin');tabs.appendChild(button);
+  tabs.classList.add('auth-tabs-manager');
   if(brandAdmin){box.querySelector('h2').textContent='브랜드관리자 로그인';box.querySelector('p').textContent='최종 관리자에게 부여받은 브랜드관리자 비밀번호를 입력하세요.';const form=box.querySelector('.auth-form');form.setAttribute('onsubmit',"authSubmit(event,'brand-admin')");form.innerHTML='<div class="formrow"><label>브랜드관리자 비밀번호</label><input type="password" name="password" autocomplete="current-password" required placeholder="부여받은 비밀번호"></div><button class="btn" style="margin-top:5px">브랜드관리자 로그인</button>';box.querySelector('.demo').textContent='브랜드 범위는 최종 관리자가 설정한 권한에 따라 적용됩니다.'}
 };
 const baseAuthSubmit=authSubmit;
