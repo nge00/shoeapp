@@ -419,9 +419,9 @@ Deno.serve(async (request) => {
 
     if (body.action === "reserved_slots") {
       const date = String(body.date || "");
-      const brand = String(body.brand || "");
+      const brand = String(body.brand || (session.role === "manager" && managerBrands.length === 1 ? managerBrands[0] : ""));
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !allowedBrands.includes(brand)) {
-        return json({ error: "예약 날짜와 브랜드를 확인해 주세요." }, 400, origin);
+        return json({ error: "예약 날짜와 담당 브랜드를 확인해 주세요." }, 400, origin);
       }
       const rows = await readRows([brand]);
       const reserved = new Set<string>();
@@ -447,6 +447,7 @@ Deno.serve(async (request) => {
     return json({ error: "관리자 요청을 처리하지 못했습니다. Supabase 설정을 확인해 주세요." }, 500, origin);
   }
 });
+
 
 
 
