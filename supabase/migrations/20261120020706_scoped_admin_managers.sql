@@ -214,7 +214,6 @@ begin
     ) slots;
 end;
 $$;
-revoke all on function public.shoeapp_reserved_slots(date) from public, anon;
 revoke all on function public.shoeapp_reserved_slots(date, text) from public, anon;
 grant execute on function public.shoeapp_reserved_slots(date, text) to authenticated;
 
