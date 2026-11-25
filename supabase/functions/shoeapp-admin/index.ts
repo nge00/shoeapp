@@ -208,6 +208,10 @@ Deno.serve(async (request) => {
       const password = typeof body.password === "string" ? body.password : "";
       const superPasswords = [Deno.env.get("ADMIN_PASSWORD"), Deno.env.get("ADMIN_PASSWORD_2")].filter(Boolean);
       if (superPasswords.some((candidate) => password === candidate)) {
+        if (body.loginMode === "manager") {
+          await rest("rpc/shoeapp_admin_login_attempt", { method: "POST", body: JSON.stringify({ p_ip_hash: rateLimitKey, p_success: false }) });
+          return json({ error: "브랜드 관리자 비밀번호를 입력해 주세요." }, 401, origin);
+        }
         await rest("rpc/shoeapp_admin_login_attempt", { method: "POST", body: JSON.stringify({ p_ip_hash: rateLimitKey, p_success: true }) });
         return await createSession("super_admin", null, origin);
       }
@@ -226,6 +230,10 @@ Deno.serve(async (request) => {
       if (!managerMatch) {
         await rest("rpc/shoeapp_admin_login_attempt", { method: "POST", body: JSON.stringify({ p_ip_hash: rateLimitKey, p_success: false }) });
         return json({ error: "관리자 비밀번호가 올바르지 않습니다." }, 401, origin);
+      }
+      if (body.loginMode === "admin") {
+        await rest("rpc/shoeapp_admin_login_attempt", { method: "POST", body: JSON.stringify({ p_ip_hash: rateLimitKey, p_success: false }) });
+        return json({ error: "최종 관리자 비밀번호를 입력해 주세요." }, 401, origin);
       }
       await rest("rpc/shoeapp_admin_login_attempt", { method: "POST", body: JSON.stringify({ p_ip_hash: rateLimitKey, p_success: true }) });
       return await createSession("manager", managerMatch.manager_slot, origin);
@@ -447,6 +455,7 @@ Deno.serve(async (request) => {
     return json({ error: "관리자 요청을 처리하지 못했습니다. Supabase 설정을 확인해 주세요." }, 500, origin);
   }
 });
+
 
 
 
