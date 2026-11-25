@@ -111,7 +111,7 @@ async function verifySession(request: Request): Promise<AdminSession | null> {
   if (!Number.isInteger(row.manager_slot) || row.manager_slot < 1 || row.manager_slot > 4) return null;
   const manager = (await profiles()).find((item) => item.manager_slot === row.manager_slot);
   const brands = await assignedBrands(row.manager_slot);
-  if (!manager?.is_active || manager.must_change_password || brands.length < 2 || brands.length > 3) return null;
+  if (!manager?.is_active || manager.must_change_password || brands.length < 1 || brands.length > 3) return null;
   return { role: "manager", managerSlot: row.manager_slot };
 }
 
@@ -218,7 +218,7 @@ Deno.serve(async (request) => {
           if (!profile.is_active || profile.must_change_password || !profile.password_hash || !profile.password_salt) continue;
           if (await verifyPassword(password, profile.password_salt, profile.password_hash, profile.password_iterations)) {
             const brands = await assignedBrands(profile.manager_slot);
-            if (brands.length >= 2 && brands.length <= 3) managerMatch = profile;
+            if (brands.length >= 1 && brands.length <= 3) managerMatch = profile;
             break;
           }
         }
@@ -333,8 +333,8 @@ Deno.serve(async (request) => {
         let mustChangePassword = old?.must_change_password ?? true;
         const newPassword = typeof manager.password === "string" ? manager.password : "";
         if (newPassword) {
-          if (newPassword.length < 12 || newPassword.length > 128) {
-            return json({ error: `브랜드관리자 ${slot} 비밀번호는 12자 이상으로 설정해 주세요.` }, 400, origin);
+          if (newPassword.length < 4 || newPassword.length > 12) {
+            return json({ error: `브랜드관리자 ${slot} 비밀번호는 4~12자로 설정해 주세요.` }, 400, origin);
           }
           if ([Deno.env.get("ADMIN_PASSWORD"), Deno.env.get("ADMIN_PASSWORD_2")].some((candidate) => candidate && candidate === newPassword)) {
             return json({ error: "최종 관리자와 브랜드관리자는 서로 다른 비밀번호를 사용해야 합니다." }, 409, origin);
@@ -354,8 +354,8 @@ Deno.serve(async (request) => {
           mustChangePassword = false;
         }
         const active = Boolean(manager.active);
-        if (active && (manager.brands.length < 2 || manager.brands.length > 3 || !passwordHash || mustChangePassword)) {
-          return json({ error: `브랜드관리자 ${slot}을 활성화하려면 12자 이상의 새 비밀번호와 고유 브랜드 2~3개가 필요합니다.` }, 400, origin);
+        if (active && (manager.brands.length < 1 || manager.brands.length > 3 || !passwordHash || mustChangePassword)) {
+          return json({ error: `브랜드관리자 ${slot}을 활성화하려면 4~12자의 비밀번호와 고유 브랜드 1~3개가 필요합니다.` }, 400, origin);
         }
         finalProfiles.push({
           manager_slot: slot,
@@ -444,3 +444,4 @@ Deno.serve(async (request) => {
     return json({ error: "관리자 요청을 처리하지 못했습니다. Supabase 설정을 확인해 주세요." }, 500, origin);
   }
 });
+
