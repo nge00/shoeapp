@@ -130,3 +130,8 @@ K2그룹 신발 어프로발 대시보드
 - 최종관리자가 브랜드를 중복 없이 배정하고 이후 변경할 수 있도록 유지하면서, 활성 브랜드관리자에게 1~3개 브랜드를 배정할 수 있도록 화면·서버·DB 검증을 통일했습니다.
 - 브랜드관리자 비밀번호 제한을 최소 4자, 최대 12자로 맞췄습니다. 로그인 세션 검증도 1개 이상 브랜드 배정을 허용합니다.
 - Supabase `shoeapp-admin` Edge Function 버전 8 및 DB 마이그레이션 `manager_access_validation`을 적용했습니다.
+
+## 브랜드관리자 권한 저장 오류 원인 및 수정 (2026-11-25)
+- 추가 로그 조사 결과, 저장 오류의 실제 원인은 DB 함수의 무조건 `DELETE`가 현재 데이터베이스의 safe-delete 설정에 차단된 것이었습니다 (`DELETE requires a WHERE clause`, SQLSTATE 21000).
+- 배정 교체 쿼리를 `DELETE ... WHERE true`로 수정해 허용된 원자적 전체 교체 흐름을 유지했습니다. 저장 RPC가 실패할 때 서버 응답의 오류 내용을 관리자 화면에 표시하도록 개선했습니다.
+- Supabase 마이그레이션 `fix_manager_access_save`와 `shoeapp-admin` Edge Function 버전 9를 적용했습니다.

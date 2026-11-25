@@ -371,7 +371,10 @@ Deno.serve(async (request) => {
       const saved = await rest("rpc/shoeapp_save_admin_managers", {
         method: "POST", body: JSON.stringify({ p_profiles: finalProfiles, p_assignments: finalAssignments }),
       });
-      if (!saved.ok) return json({ error: "브랜드관리자 설정을 저장하지 못했습니다. 활성 상태와 브랜드 배정 수를 확인해 주세요." }, 400, origin);
+      if (!saved.ok) {
+        const detail = (await saved.text()).slice(0, 240);
+        return json({ error: `브랜드관리자 설정 저장 실패: ${detail || "DB 요청 오류"}` }, 400, origin);
+      }
       return json({ ok: true, sessionsRevoked: true }, 200, origin);
     }
 
@@ -444,4 +447,6 @@ Deno.serve(async (request) => {
     return json({ error: "관리자 요청을 처리하지 못했습니다. Supabase 설정을 확인해 주세요." }, 500, origin);
   }
 });
+
+
 
