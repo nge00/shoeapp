@@ -238,7 +238,20 @@ Deno.serve(async (request) => {
 
     if (body.action === "read") {
       const rows = await readRows(allowedBrands);
-      return json({ rows, schedules: await readSchedules(), role: session.role, managerSlot: session.managerSlot, brands: allowedBrands }, 200, origin);
+      const calendarRows = session.role === "manager" ? await readRows(BRANDS) : rows;
+      const calendarBookings = calendarRows.flatMap((row) =>
+        (Array.isArray(row.payload?.books) ? row.payload.books : []).map((booking: any) => ({
+          id: String(booking.id || ""),
+          groupId: String(booking.groupId || booking.id || ""),
+          brand: row.brand,
+          date: String(booking.date || ""),
+          time: String(booking.time || ""),
+          sample: String(booking.sample || booking.title || "미팅"),
+          room: String(booking.room || ""),
+          completed: booking.completed === true,
+        }))
+      );
+      return json({ rows, schedules: await readSchedules(), calendarBookings, role: session.role, managerSlot: session.managerSlot, brands: allowedBrands }, 200, origin);
     }
 
     if (body.action === "save") {
@@ -407,7 +420,7 @@ Deno.serve(async (request) => {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !allowedBrands.includes(brand)) {
         return json({ error: "예약 날짜와 브랜드를 확인해 주세요." }, 400, origin);
       }
-      const rows = await readRows(BRANDS);
+      const rows = await readRows([brand]);
       const reserved = new Set<string>();
       for (const row of rows) {
         for (const booking of Array.isArray(row.payload?.books) ? row.payload.books : []) {

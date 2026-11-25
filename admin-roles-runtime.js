@@ -4,13 +4,14 @@
 async function readRemoteState(){
   if(current?.role==='관리자'&&adminToken){
     const result=await adminApi('read');
-    const role=result.role||'super_admin';
+    if(!['super_admin','manager'].includes(result.role))throw new Error('관리자 권한을 확인하지 못했습니다. 다시 로그인해 주세요.');
+    const role=result.role;
     current.adminRole=role;current.managerSlot=result.managerSlot??null;current.brand='전체';
     current.name=role==='super_admin'?'최종 관리자':`브랜드관리자 ${result.managerSlot}`;
     managerBrands=result.brands||[];filterBrand='전체';
     samples=result.rows.flatMap(row=>Array.isArray(row.payload?.samples)?row.payload.samples:[]);
     books=result.rows.flatMap(row=>Array.isArray(row.payload?.books)?row.payload.books:[]);
-    season=result.rows.find(row=>row.payload?.season)?.payload.season||'';schedules=result.schedules||[];return;
+    season=result.rows.find(row=>row.payload?.season)?.payload.season||'';schedules=result.schedules||[];sharedCalendarBookings=result.calendarBookings||[];return;
   }
   const userId=supaSession?.user?.id;if(!userId)throw new Error('로그인이 필요합니다.');
   const memberResponse=await supabaseFetch('rest/v1/shoeapp_memberships?select=brand,username&user_id=eq.'+encodeURIComponent(userId),{cache:'no-store'});
@@ -32,7 +33,7 @@ async function fetchReservedTimes(date,brand){
   if(!date)return new Set();
   if(isMiddleAdmin()){const result=await adminApi('reserved_slots',{date,brand});return new Set(result.times||[])}
   if(isFinalAdmin())return new Set([
-    ...books.filter(b=>!b.completed&&b.date===date).map(b=>String(b.time||'')),
+    ...books.filter(b=>!b.completed&&b.date===date&&b.brand===brand).map(b=>String(b.time||'')),
     ...schedules.filter(x=>x.date===date&&(x.brand==null||x.brand===brand)).flatMap(x=>x.times||[])
   ]);
   const response=await supabaseFetch('rest/v1/rpc/shoeapp_reserved_slots',{method:'POST',cache:'no-store',body:JSON.stringify({p_slot_date:date,p_brand:brand||current?.brand})});
@@ -50,10 +51,13 @@ function openScheduleViewer(date){
 function selectCalendarDay(date){if(current?.role==='관리자')openScheduleDay(date);else openScheduleViewer(date)}
 function openScheduleDay(date){
   const day=schedules.filter(x=>x.date===date);
-  const rows=day.length?day.map(item=>{
+  const dayMeetings=(isMiddleAdmin()?sharedCalendarBookings:books).filter(item=>item.date===date&&!item.completed);
+  const bookingRows=dayMeetings.map(item=>`<article class="feed-row"><span class="feed-dot"></span><p><strong>${h(item.brand)} · ${h(item.sample||'미팅')}</strong><small>미팅 예약 · ${h(item.time||'시간 미정')}${item.room?' · '+h(item.room):''}</small></p></article>`).join('');
+  const scheduleRows=day.length?day.map(item=>{
     const editable=isFinalAdmin()||(isMiddleAdmin()&&item.brand!==null&&managerBrands.includes(item.brand));
     return `<article class="feed-row"><span class="feed-dot"></span><p><strong>${h(item.title)}</strong><small>${h(item.brand||'공통 일정')} · ${h((item.times||[]).join(', '))}</small></p>${editable?`<button class="btn light small" type="button" onclick="openScheduleForm('${h(date)}','${h(item.id)}')">수정</button>`:''}</article>`;
-  }).join(''):'<p style="color:#7d817b">등록된 일정이 없습니다.</p>';
+  }).join(''):'';
+  const rows=bookingRows+scheduleRows||'<p style="color:#7d817b">등록된 일정이 없습니다.</p>';
   const add=(isFinalAdmin()||isMiddleAdmin())?`<button type="button" class="btn" onclick="openScheduleForm('${h(date)}')">＋ 일정 등록</button>`:'';
   document.getElementById('modal').innerHTML=`<div class="modal"><div class="modal-top"><h2>${h(date)} 일정</h2><button class="close" onclick="closeModal()">×</button></div><div>${rows}</div><div class="modal-actions">${add}<button type="button" class="btn light" onclick="closeModal()">닫기</button></div></div>`;
   document.getElementById('modal').classList.add('show');
