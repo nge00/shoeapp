@@ -315,10 +315,10 @@ language sql stable security definer set search_path = '' as $$
     where s.brand is not null and (b.value->>'completed') is distinct from 'true'
       and b.value->>'date'=p_slot_date::text and nullif(b.value->>'time','') is not null
     union all
-    select t.value #>> '{}' as slot_time
+    select t.value as slot_time
     from public.shoeapp s cross join lateral jsonb_array_elements(coalesce(s.payload->'schedules','[]'::jsonb)) e(value)
       cross join lateral jsonb_array_elements_text(coalesce(e.value->'times','[]'::jsonb)) t(value)
-    where s.brand is not null and e.value->>'date'=p_slot_date::text and nullif(t.value #>> '{}','') is not null
+    where s.brand is not null and e.value->>'date'=p_slot_date::text and nullif(t.value,'') is not null
   ) slots;
 $$;
 revoke all on function public.shoeapp_reserved_slots(date) from public, anon;

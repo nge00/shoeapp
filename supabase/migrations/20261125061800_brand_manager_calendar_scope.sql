@@ -24,12 +24,12 @@ begin
         and (schedule.brand is null or schedule.brand = p_brand)
         and nullif(t.value,'') is not null
       union all
-      select t.value #>> '{}' as slot_time
+      select t.value as slot_time
       from public.shoeapp s
       cross join lateral jsonb_array_elements(coalesce(s.payload->'schedules','[]'::jsonb)) e(value)
       cross join lateral jsonb_array_elements_text(coalesce(e.value->'times','[]'::jsonb)) t(value)
       where s.brand is not null and e.value->>'date' = p_slot_date::text
-        and nullif(t.value #>> '{}','') is not null
+        and nullif(t.value,'') is not null
     ) slots;
 end;
 $$;
